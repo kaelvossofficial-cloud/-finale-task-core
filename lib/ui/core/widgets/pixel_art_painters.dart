@@ -218,12 +218,18 @@ class VoxelBlockCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(borderRadius),
-        border: Border(
-          top: BorderSide(color: highlight, width: 1.5),
-          left: BorderSide(color: highlight, width: 1.5),
-          right: BorderSide(color: shadow, width: 2.0),
-          bottom: BorderSide(color: shadow, width: 2.5),
+        border: Border.all(
+          color: accentBorderColor ?? highlight,
+          width: 1.5,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: shadow,
+            offset: const Offset(1.5, 2.0),
+            blurRadius: 0,
+            spreadRadius: 0,
+          ),
+        ],
       ),
       child: child,
     );
