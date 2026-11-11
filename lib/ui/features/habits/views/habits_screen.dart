@@ -416,7 +416,7 @@ class _HabitWaterfallCard extends StatelessWidget {
                 ),
                 CupertinoButton(
                   padding: EdgeInsets.zero,
-                  minSize: 24,
+                  minimumSize: const Size(24, 24),
                   onPressed: onMenu,
                   child: PixelSpriteIcon(
                     type: PixelSpriteType.dots,
@@ -563,7 +563,7 @@ class _HabitVoxelTile extends StatelessWidget {
                 // Three-dots (`...`) Menu
                 CupertinoButton(
                   padding: const EdgeInsets.only(left: 4),
-                  minSize: 26,
+                  minimumSize: const Size(26, 26),
                   onPressed: onTapThreeDots,
                   child: PixelSpriteIcon(
                     type: PixelSpriteType.dots,

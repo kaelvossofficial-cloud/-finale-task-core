@@ -36,7 +36,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 CupertinoButton(
                   padding: EdgeInsets.zero,
-                  minSize: 28,
+                  minimumSize: const Size(28, 28),
                   onPressed: () => Navigator.of(modalCtx).pop(),
                   child: const Text('Cancel'),
                 ),
@@ -109,7 +109,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   CupertinoButton(
                     padding: EdgeInsets.zero,
-                    minSize: 28,
+                    minimumSize: const Size(28, 28),
                     onPressed: () => Navigator.of(modalContext).pop(),
                     child: const Text('Done'),
                   ),
@@ -168,7 +168,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   CupertinoButton(
                     padding: EdgeInsets.zero,
-                    minSize: 28,
+                    minimumSize: const Size(28, 28),
                     onPressed: () => Navigator.of(modalContext).pop(),
                     child: const Text('Cancel'),
                   ),
@@ -364,7 +364,7 @@ class SettingsScreen extends StatelessWidget {
                         ),
                         CupertinoButton(
                           padding: EdgeInsets.zero,
-                          minSize: 30,
+                          minimumSize: const Size(30, 30),
                           onPressed: () => _openEditProfileSheet(context),
                           child: const Text('Edit'),
                         ),

@@ -133,7 +133,7 @@ class _HabitCreatorSheetState extends State<HabitCreatorSheet> {
                 ),
                 CupertinoButton(
                   padding: EdgeInsets.zero,
-                  minSize: 28,
+                  minimumSize: const Size(28, 28),
                   onPressed: () => Navigator.of(context).pop(),
                   child: Text(
                     'Cancel',

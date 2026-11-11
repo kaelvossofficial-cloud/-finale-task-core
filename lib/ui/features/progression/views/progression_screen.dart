@@ -35,7 +35,7 @@ class ProgressionScreen extends StatelessWidget {
                 ),
                 CupertinoButton(
                   padding: EdgeInsets.zero,
-                  minSize: 28,
+                  minimumSize: const Size(28, 28),
                   onPressed: () => Navigator.of(modalCtx).pop(),
                   child: const Text('Cancel'),
                 ),
@@ -425,8 +425,8 @@ class ProgressionScreen extends StatelessWidget {
                       ),
                       PressableScale(
                         onTap: () => _openAddFriendSheet(context),
-                        child: PixelTagChip(
-                          key: const Key('add_friend_button'),
+                        child: const PixelTagChip(
+                          key: Key('add_friend_button'),
                           label: '+ FRIEND',
                           color: PixelCupertinoTheme.emeraldXp,
                           glow: true,

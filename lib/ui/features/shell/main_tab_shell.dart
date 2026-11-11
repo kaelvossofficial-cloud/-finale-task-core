@@ -337,7 +337,7 @@ class _CapsuleNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = PixelCupertinoTheme.emeraldXp;
+    const activeColor = PixelCupertinoTheme.emeraldXp;
     final inactiveColor = CupertinoDynamicColor.resolve(
       PixelCupertinoTheme.secondaryLabel,
       context,

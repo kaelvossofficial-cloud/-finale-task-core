@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 
-import '../../../../domain/models/habit_item.dart';
 import '../../../core/theme/pixel_cupertino_theme.dart';
 import '../../../core/widgets/frosted_sheet_container.dart';
 import '../../../core/widgets/pixel_art_painters.dart';
@@ -115,7 +114,7 @@ class _HabitDetailSheetState extends State<HabitDetailSheet> {
                     ),
                     CupertinoButton(
                       padding: EdgeInsets.zero,
-                      minSize: 30,
+                      minimumSize: const Size(30, 30),
                       onPressed: () {
                         Navigator.of(context).pop();
                         widget.onEditHabit();

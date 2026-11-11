@@ -441,7 +441,7 @@ class _TactileDismissTaskCardState extends State<TactileDismissTaskCard>
                         // Three-Dots (`...`) Action Menu Button
                         CupertinoButton(
                           padding: const EdgeInsets.only(left: 8),
-                          minSize: 28,
+                          minimumSize: const Size(28, 28),
                           onPressed: () => _showThreeDotsMenu(context),
                           child: PixelSpriteIcon(
                             type: PixelSpriteType.dots,
