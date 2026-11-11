@@ -12,6 +12,11 @@ void main() {
   testWidgets(
       'Finale Task Core renders floating nav capsule, center craft axe, drum picker, and all screens',
       (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final repo = TaskHabitRepository(
       storageService: LocalStorageService(enableSqlite: false),
