@@ -2,19 +2,22 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../../data/services/haptic_service.dart';
 import '../../../../domain/models/task_item.dart';
+import '../../../../domain/models/time_block.dart';
 import '../../../core/theme/pixel_cupertino_theme.dart';
 import '../../../core/widgets/frosted_sheet_container.dart';
+import '../../../core/widgets/pixel_art_painters.dart';
 import '../../../core/widgets/pressable_scale.dart';
 
-/// Quick Task Creator modal bottom sheet:
-/// - Title (string, required)
-/// - Due Date/Time (timestamp, optional)
-/// - Priority/Tag (enum: Low, Medium, High)
+/// Quick Task Creator & Reminder/Alarm Editor sheet:
+/// - Supports creating a new task or editing an existing task's reminder/alarm (via left-swipe).
+/// - Includes iOS & Android compatible Reminder + Alarm switch.
 class QuickTaskCreatorSheet extends StatefulWidget {
   const QuickTaskCreatorSheet({
     super.key,
     required this.hapticService,
     required this.onCreateTask,
+    this.existingTask,
+    this.onUpdateTask,
   });
 
   final HapticService hapticService;
@@ -22,23 +25,38 @@ class QuickTaskCreatorSheet extends StatefulWidget {
     required String title,
     DateTime? dueDate,
     required TaskPriority priority,
+    DateTime? reminderAt,
+    bool isAlarmEnabled,
+    String? blockId,
   }) onCreateTask;
+  final TaskItem? existingTask;
+  final Future<void> Function(TaskItem updated)? onUpdateTask;
 
   @override
   State<QuickTaskCreatorSheet> createState() => _QuickTaskCreatorSheetState();
 }
 
 class _QuickTaskCreatorSheetState extends State<QuickTaskCreatorSheet> {
-  final TextEditingController _titleController = TextEditingController();
-  TaskPriority _selectedPriority = TaskPriority.medium;
-  bool _hasDueDate = true;
+  late final TextEditingController _titleController;
+  late TaskPriority _selectedPriority;
+  late bool _hasDueDate;
   late DateTime _selectedDueDate;
+  late bool _isAlarmEnabled;
+  late String _selectedBlockId;
   String? _validationError;
 
   @override
   void initState() {
     super.initState();
-    _selectedDueDate = DateTime.now().add(const Duration(hours: 2));
+    final existing = widget.existingTask;
+    _titleController = TextEditingController(text: existing?.title ?? '');
+    _selectedPriority = existing?.priority ?? TaskPriority.medium;
+    _hasDueDate = existing != null ? existing.dueDate != null : true;
+    _selectedDueDate =
+        existing?.dueDate ?? DateTime.now().add(const Duration(hours: 2));
+    _isAlarmEnabled = existing?.isAlarmEnabled ?? false;
+    _selectedBlockId =
+        existing?.blockId ?? TimeBlock.current(_selectedDueDate).id;
   }
 
   @override
@@ -52,23 +70,63 @@ class _QuickTaskCreatorSheetState extends State<QuickTaskCreatorSheet> {
     if (trimmed.isEmpty) {
       await widget.hapticService.mediumImpact();
       setState(() {
-        _validationError = 'Task title is required to craft a quest.';
+        _validationError = 'Task title is required.';
       });
       return;
     }
 
-    await widget.onCreateTask(
-      title: trimmed,
-      dueDate: _hasDueDate ? _selectedDueDate : null,
-      priority: _selectedPriority,
-    );
+    if (widget.existingTask != null && widget.onUpdateTask != null) {
+      final updated = widget.existingTask!.copyWith(
+        title: trimmed,
+        dueDate: _hasDueDate ? _selectedDueDate : null,
+        clearDueDate: !_hasDueDate,
+        reminderAt: _hasDueDate ? _selectedDueDate : null,
+        clearReminder: !_hasDueDate,
+        priority: _selectedPriority,
+        isAlarmEnabled: _isAlarmEnabled,
+        blockId: _selectedBlockId,
+      );
+      await widget.onUpdateTask!(updated);
+    } else {
+      await widget.onCreateTask(
+        title: trimmed,
+        dueDate: _hasDueDate ? _selectedDueDate : null,
+        priority: _selectedPriority,
+        reminderAt: _hasDueDate ? _selectedDueDate : null,
+        isAlarmEnabled: _isAlarmEnabled,
+        blockId: _selectedBlockId,
+      );
+    }
     if (mounted) {
       Navigator.of(context).pop();
     }
   }
 
+  PixelSpriteType _barSprite(TaskPriority p) {
+    switch (p) {
+      case TaskPriority.high:
+        return PixelSpriteType.redstoneBar;
+      case TaskPriority.medium:
+        return PixelSpriteType.goldBar;
+      case TaskPriority.low:
+        return PixelSpriteType.ironBar;
+    }
+  }
+
+  Color _barColor(TaskPriority p) {
+    switch (p) {
+      case TaskPriority.high:
+        return PixelCupertinoTheme.redstoneCrimson;
+      case TaskPriority.medium:
+        return PixelCupertinoTheme.goldIngot;
+      case TaskPriority.low:
+        return PixelCupertinoTheme.ironIngot;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isEditing = widget.existingTask != null;
     return FrostedSheetContainer(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -77,9 +135,21 @@ class _QuickTaskCreatorSheetState extends State<QuickTaskCreatorSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Craft New Task Block',
-                style: PixelCupertinoTheme.headlineStyle(context),
+              Row(
+                children: [
+                  PixelSpriteIcon(
+                    type: isEditing
+                        ? PixelSpriteType.alarm
+                        : PixelSpriteType.craftAxe,
+                    size: 18,
+                    primaryColor: PixelCupertinoTheme.emeraldXp,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isEditing ? 'Edit Quest & Reminder' : 'Craft Quest',
+                    style: PixelCupertinoTheme.headlineStyle(context),
+                  ),
+                ],
               ),
               CupertinoButton(
                 padding: EdgeInsets.zero,
@@ -92,14 +162,14 @@ class _QuickTaskCreatorSheetState extends State<QuickTaskCreatorSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
           // Task Title Field (Required)
           CupertinoTextField(
             key: const Key('quick_task_title_input'),
             controller: _titleController,
-            autofocus: true,
-            placeholder: 'Task title (e.g., Mine 16 Obsidian Blocks)...',
+            autofocus: !isEditing,
+            placeholder: 'Quest title...',
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             style: PixelCupertinoTheme.bodyStyle(context),
             decoration: BoxDecoration(
@@ -118,17 +188,10 @@ class _QuickTaskCreatorSheetState extends State<QuickTaskCreatorSheet> {
                 width: 1.0,
               ),
             ),
-            onChanged: (_) {
-              if (_validationError != null) {
-                setState(() {
-                  _validationError = null;
-                });
-              }
-            },
             onSubmitted: (_) => _submit(),
           ),
           if (_validationError != null) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             Text(
               _validationError!,
               style: PixelCupertinoTheme.subheadStyle(context).copyWith(
@@ -136,19 +199,9 @@ class _QuickTaskCreatorSheetState extends State<QuickTaskCreatorSheet> {
               ),
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // Priority / Tag Selector (Low, Medium, High)
-          Text(
-            'PRIORITY / ORE TAG',
-            style: PixelCupertinoTheme.pixelBadgeStyle(
-              color: CupertinoDynamicColor.resolve(
-                PixelCupertinoTheme.secondaryLabel,
-                context,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
+          // Priority Ore Bar Selector (Just Iron / Gold / Redstone bar icons)
           CupertinoSlidingSegmentedControl<TaskPriority>(
             key: const Key('quick_task_priority_control'),
             groupValue: _selectedPriority,
@@ -156,17 +209,24 @@ class _QuickTaskCreatorSheetState extends State<QuickTaskCreatorSheet> {
               for (final p in TaskPriority.values)
                 p: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Text(
-                    '${p.label} (${p.craftTag})',
-                    style: PixelCupertinoTheme.subheadStyle(context).copyWith(
-                      fontWeight: _selectedPriority == p
-                          ? FontWeight.w600
-                          : FontWeight.w400,
-                      color: CupertinoDynamicColor.resolve(
-                        PixelCupertinoTheme.primaryLabel,
-                        context,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      PixelSpriteIcon(
+                        type: _barSprite(p),
+                        size: 14,
+                        primaryColor: _barColor(p),
+                        secondaryColor: CupertinoColors.white,
                       ),
-                    ),
+                      const SizedBox(width: 6),
+                      Text(
+                        p.craftTag,
+                        style: PixelCupertinoTheme.pixelBadgeStyle(
+                          color: _barColor(p),
+                          fontSize: 9.5,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
             },
@@ -178,22 +238,23 @@ class _QuickTaskCreatorSheetState extends State<QuickTaskCreatorSheet> {
               });
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // Optional Due Date/Time Toggle
+          // Reminder & Alarm Row (iOS Time-Sensitive / Android Exact Alarm compatible)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Row(
                 children: [
-                  Text(
-                    'Due Date & Time',
-                    style: PixelCupertinoTheme.bodyStyle(context),
+                  const PixelSpriteIcon(
+                    type: PixelSpriteType.bell,
+                    size: 16,
+                    primaryColor: PixelCupertinoTheme.diamondCyan,
                   ),
+                  const SizedBox(width: 8),
                   Text(
-                    'Complete before due time for +5 XP bonus',
-                    style: PixelCupertinoTheme.subheadStyle(context),
+                    'Reminder & Due Time',
+                    style: PixelCupertinoTheme.bodyStyle(context),
                   ),
                 ],
               ),
@@ -212,9 +273,39 @@ class _QuickTaskCreatorSheetState extends State<QuickTaskCreatorSheet> {
           ),
 
           if (_hasDueDate) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const PixelSpriteIcon(
+                      type: PixelSpriteType.alarm,
+                      size: 15,
+                      primaryColor: PixelCupertinoTheme.goldIngot,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Sound Alarm (iOS/Android)',
+                      style: PixelCupertinoTheme.subheadStyle(context),
+                    ),
+                  ],
+                ),
+                CupertinoSwitch(
+                  value: _isAlarmEnabled,
+                  activeTrackColor: PixelCupertinoTheme.goldIngot,
+                  onChanged: (val) {
+                    widget.hapticService.lightImpact();
+                    setState(() {
+                      _isAlarmEnabled = val;
+                    });
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             Container(
-              height: 136,
+              height: 126,
               decoration: BoxDecoration(
                 color: CupertinoDynamicColor.resolve(
                   PixelCupertinoTheme.secondaryGroupedBackground,
@@ -232,28 +323,26 @@ class _QuickTaskCreatorSheetState extends State<QuickTaskCreatorSheet> {
               ),
             ),
           ],
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
-          // Primary Craft Button with PressableScale
+          // Primary Craft Button
           PressableScale(
             onTap: _submit,
             child: Container(
               key: const Key('quick_task_submit_button'),
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: const EdgeInsets.symmetric(vertical: 13),
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: PixelCupertinoTheme.emeraldXp,
                 borderRadius: BorderRadius.circular(11),
-                border: const Border(
-                  top: BorderSide(color: Color(0x88FFFFFF), width: 1.5),
-                  left: BorderSide(color: Color(0x88FFFFFF), width: 1.5),
-                  right: BorderSide(color: Color(0x66000000), width: 2.0),
-                  bottom: BorderSide(color: Color(0x88000000), width: 2.5),
+                boxShadow: PixelCupertinoTheme.glowShadows(
+                  PixelCupertinoTheme.emeraldXp,
+                  intensity: 0.35,
                 ),
               ),
-              child: const Text(
-                'Add Task (+10 XP / +5 Bonus)',
-                style: TextStyle(
+              child: Text(
+                isEditing ? 'Save Reminder' : 'Craft Quest (+15xp)',
+                style: const TextStyle(
                   fontFamily: '.SF Pro Text',
                   fontSize: 16,
                   fontWeight: FontWeight.w600,

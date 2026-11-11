@@ -6,23 +6,27 @@ import '../../../domain/models/task_item.dart';
 import '../theme/pixel_cupertino_theme.dart';
 import 'pixel_art_painters.dart';
 
-/// Interactive swipe/slide gesture card that replaces static checkboxes.
-///
-/// - Smooth horizontal drag using `SpringSimulation(SpringDescription(mass: 1, stiffness: 300, damping: 25))`
-/// - Triggers immediate `HapticFeedback.mediumImpact` upon crossing the completion threshold
-/// - Animates the card out using GPU-composited `Transform.translate` and `Opacity`
+/// Bi-directional interactive swipe card:
+/// - **Swipe Right**: Mark task complete (`HapticFeedback.mediumImpact()` + GPU-composited slide-out + `+15xp`)
+/// - **Swipe Left**: Edit reminder / alarm (`HapticFeedback.lightImpact()` + snaps back and opens reminder editor)
+/// - **Three-dots menu (`...`)**: Quick options (Edit Reminder, Delay +1h, Delete)
+/// - **Minimalist pixel labels**: Bar sprite only (no `MEDIUM · GOLD`), `+10xp`, `Nov 11 14:30` in corner, no `>>>`.
 class TactileDismissTaskCard extends StatefulWidget {
   const TactileDismissTaskCard({
     super.key,
     required this.task,
     required this.hapticService,
     required this.onCompleted,
+    this.onEditReminder,
+    this.onDelayTask,
     this.onDelete,
   });
 
   final TaskItem task;
   final HapticService hapticService;
   final Future<void> Function(TaskItem task) onCompleted;
+  final VoidCallback? onEditReminder;
+  final void Function(Duration delay)? onDelayTask;
   final VoidCallback? onDelete;
 
   @override
@@ -31,7 +35,8 @@ class TactileDismissTaskCard extends StatefulWidget {
 
 class _TactileDismissTaskCardState extends State<TactileDismissTaskCard>
     with SingleTickerProviderStateMixin {
-  static const double _completionRatioThreshold = 0.32;
+  static const double _completionRatioThreshold = 0.28;
+  static const double _editReminderRatioThreshold = -0.24;
   static const SpringDescription _iosSpring = SpringDescription(
     mass: 1.0,
     stiffness: 300.0,
@@ -49,7 +54,7 @@ class _TactileDismissTaskCardState extends State<TactileDismissTaskCard>
     _controller = AnimationController(
       vsync: this,
       value: 0.0,
-      lowerBound: 0.0,
+      lowerBound: -0.65,
       upperBound: 1.25,
     );
   }
@@ -63,13 +68,17 @@ class _TactileDismissTaskCardState extends State<TactileDismissTaskCard>
   void _onHorizontalDragUpdate(DragUpdateDetails details) {
     if (widget.task.isCompleted || _isCompleting) return;
     final deltaRatio = (details.primaryDelta ?? 0.0) / _cardWidth;
-    final nextValue = (_controller.value + deltaRatio).clamp(0.0, 1.0);
+    final minBound = widget.onEditReminder != null ? -0.50 : 0.0;
+    final nextValue = (_controller.value + deltaRatio).clamp(minBound, 1.0);
     _controller.value = nextValue;
 
-    if (!_thresholdReached && nextValue >= _completionRatioThreshold) {
+    final crossedRight = nextValue >= _completionRatioThreshold;
+    final crossedLeft = nextValue <= _editReminderRatioThreshold;
+
+    if (!_thresholdReached && (crossedRight || crossedLeft)) {
       _thresholdReached = true;
       widget.hapticService.mediumImpact();
-    } else if (_thresholdReached && nextValue < _completionRatioThreshold) {
+    } else if (_thresholdReached && !crossedRight && !crossedLeft) {
       _thresholdReached = false;
       widget.hapticService.lightImpact();
     }
@@ -85,15 +94,24 @@ class _TactileDismissTaskCardState extends State<TactileDismissTaskCard>
         await widget.hapticService.mediumImpact();
       }
       await _triggerSlideOutCompletion();
-    } else {
-      _thresholdReached = false;
-      final spring = SpringSimulation(
-        _iosSpring,
-        _controller.value,
-        0.0,
-        velocityRatio,
-      );
-      _controller.animateWith(spring);
+      return;
+    }
+
+    final shouldOpenReminder = widget.onEditReminder != null &&
+        (_controller.value <= _editReminderRatioThreshold ||
+            velocityRatio < -1.8);
+
+    _thresholdReached = false;
+    final spring = SpringSimulation(
+      _iosSpring,
+      _controller.value,
+      0.0,
+      velocityRatio,
+    );
+    _controller.animateWith(spring);
+
+    if (shouldOpenReminder) {
+      widget.onEditReminder?.call();
     }
   }
 
@@ -123,28 +141,82 @@ class _TactileDismissTaskCardState extends State<TactileDismissTaskCard>
     }
   }
 
-  String _formatDueTimestamp(DateTime dueDate) {
-    final now = DateTime.now();
-    final isToday = dueDate.year == now.year &&
-        dueDate.month == now.month &&
-        dueDate.day == now.day;
-    final hh = dueDate.hour.toString().padLeft(2, '0');
-    final mm = dueDate.minute.toString().padLeft(2, '0');
-    if (isToday) {
-      return 'Due Today $hh:$mm';
+  PixelSpriteType _priorityBarSprite(TaskPriority priority) {
+    switch (priority) {
+      case TaskPriority.high:
+        return PixelSpriteType.redstoneBar;
+      case TaskPriority.medium:
+        return PixelSpriteType.goldBar;
+      case TaskPriority.low:
+        return PixelSpriteType.ironBar;
     }
-    final month = dueDate.month.toString().padLeft(2, '0');
-    final day = dueDate.day.toString().padLeft(2, '0');
-    return 'Due $month/$day $hh:$mm';
+  }
+
+  void _showThreeDotsMenu(BuildContext context) {
+    widget.hapticService.lightImpact();
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (sheetCtx) => CupertinoActionSheet(
+        title: Text(widget.task.title),
+        actions: [
+          if (!widget.task.isCompleted && widget.onEditReminder != null)
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.of(sheetCtx).pop();
+                widget.onEditReminder?.call();
+              },
+              child: const Text('Set Reminder / Alarm'),
+            ),
+          if (!widget.task.isCompleted && widget.onDelayTask != null) ...[
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.of(sheetCtx).pop();
+                widget.onDelayTask?.call(const Duration(minutes: 15));
+              },
+              child: const Text('Delay +15m'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.of(sheetCtx).pop();
+                widget.onDelayTask?.call(const Duration(hours: 1));
+              },
+              child: const Text('Delay +1h'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.of(sheetCtx).pop();
+                widget.onDelayTask?.call(const Duration(days: 1));
+              },
+              child: const Text('Delay Tomorrow'),
+            ),
+          ],
+          if (widget.onDelete != null)
+            CupertinoActionSheetAction(
+              isDestructiveAction: true,
+              onPressed: () {
+                Navigator.of(sheetCtx).pop();
+                widget.onDelete?.call();
+              },
+              child: const Text('Delete Quest'),
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.of(sheetCtx).pop(),
+          child: const Text('Cancel'),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final task = widget.task;
     final pColor = _priorityColor(task.priority);
+    final barSprite = _priorityBarSprite(task.priority);
     final isOnTimeEligible =
         task.dueDate == null || !DateTime.now().isAfter(task.dueDate!);
     final potentialXp = isOnTimeEligible ? 15 : 10;
+    final cornerTime = task.shortCornerTimestamp;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -160,54 +232,66 @@ class _TactileDismissTaskCardState extends State<TactileDismissTaskCard>
                 task.isCompleted ? null : _onHorizontalDragUpdate,
             onHorizontalDragEnd: task.isCompleted ? null : _onHorizontalDragEnd,
             child: Stack(
-              alignment: Alignment.centerLeft,
+              alignment: Alignment.center,
               children: [
-                // Underlying Emerald Mining Action Track
+                // Underlying Bi-Directional Action Track (Right = Mine +XP, Left = Reminder/Alarm)
                 if (!task.isCompleted)
                   Positioned.fill(
                     child: AnimatedBuilder(
                       animation: _controller,
                       builder: (context, _) {
-                        final reached =
-                            _controller.value >= _completionRatioThreshold;
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 18),
-                          decoration: BoxDecoration(
-                            color: reached
+                        final val = _controller.value;
+                        final isSwipingLeft = val < -0.02;
+                        final reachedRight = val >= _completionRatioThreshold;
+                        final reachedLeft = val <= _editReminderRatioThreshold;
+
+                        final activeColor = isSwipingLeft
+                            ? (reachedLeft
+                                ? PixelCupertinoTheme.diamondCyan
+                                : CupertinoDynamicColor.resolve(
+                                    PixelCupertinoTheme.tertiarySlotBackground,
+                                    context,
+                                  ))
+                            : (reachedRight
                                 ? PixelCupertinoTheme.emeraldDark
                                 : CupertinoDynamicColor.resolve(
                                     PixelCupertinoTheme.tertiarySlotBackground,
                                     context,
-                                  ),
+                                  ));
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: activeColor,
                             borderRadius: BorderRadius.circular(11),
-                            border: Border.all(
-                              color: reached
-                                  ? PixelCupertinoTheme.emeraldXp
-                                  : CupertinoColors.transparent,
-                              width: 1.5,
-                            ),
+                            boxShadow: (reachedRight || reachedLeft)
+                                ? PixelCupertinoTheme.glowShadows(
+                                    isSwipingLeft
+                                        ? PixelCupertinoTheme.diamondCyan
+                                        : PixelCupertinoTheme.emeraldXp,
+                                  )
+                                : null,
                           ),
                           child: Row(
+                            mainAxisAlignment: isSwipingLeft
+                                ? MainAxisAlignment.end
+                                : MainAxisAlignment.start,
                             children: [
                               PixelSpriteIcon(
-                                type: reached
-                                    ? PixelSpriteType.xpOrb
-                                    : PixelSpriteType.pickaxe,
+                                type: isSwipingLeft
+                                    ? PixelSpriteType.alarm
+                                    : PixelSpriteType.xpOrb,
                                 size: 18,
-                                primaryColor: reached
-                                    ? CupertinoColors.white
-                                    : PixelCupertinoTheme.emeraldXp,
+                                primaryColor: CupertinoColors.white,
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 8),
                               Text(
-                                reached
-                                    ? 'RELEASE TO CLAIM +$potentialXp XP!'
-                                    : 'SLIDE RIGHT TO MINE (+$potentialXp XP)',
+                                isSwipingLeft
+                                    ? 'REMINDER'
+                                    : '+${potentialXp}xp',
                                 style: PixelCupertinoTheme.pixelBadgeStyle(
-                                  color: reached
-                                      ? CupertinoColors.white
-                                      : PixelCupertinoTheme.emeraldXp,
-                                  fontSize: 11.5,
+                                  color: CupertinoColors.white,
+                                  fontSize: 11,
                                 ),
                               ),
                             ],
@@ -222,8 +306,8 @@ class _TactileDismissTaskCardState extends State<TactileDismissTaskCard>
                   animation: _controller,
                   builder: (context, child) {
                     final offsetPx = _controller.value * _cardWidth;
-                    final opacity =
-                        (1.0 - (_controller.value * 0.65)).clamp(0.0, 1.0);
+                    final opacity = (1.0 - (_controller.value.abs() * 0.55))
+                        .clamp(0.0, 1.0);
                     return Transform.translate(
                       offset: Offset(offsetPx, 0),
                       child: Opacity(
@@ -236,13 +320,14 @@ class _TactileDismissTaskCardState extends State<TactileDismissTaskCard>
                     accentBorderColor: task.isCompleted
                         ? PixelCupertinoTheme.emeraldXp.withValues(alpha: 0.45)
                         : null,
+                    glow: task.isCompleted,
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Left Voxel Status Slot (Pickaxe / Emerald Check)
+                        // Left Voxel Ore Slot (Bar sprite only — no text bloat)
                         Container(
-                          width: 36,
-                          height: 36,
+                          width: 34,
+                          height: 34,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: CupertinoDynamicColor.resolve(
@@ -260,117 +345,113 @@ class _TactileDismissTaskCardState extends State<TactileDismissTaskCard>
                           child: PixelSpriteIcon(
                             type: task.isCompleted
                                 ? PixelSpriteType.checkmark
-                                : PixelSpriteType.pickaxe,
+                                : barSprite,
                             size: 16,
                             primaryColor: task.isCompleted
                                 ? PixelCupertinoTheme.emeraldXp
                                 : pColor,
+                            secondaryColor: CupertinoColors.white,
                           ),
                         ),
                         const SizedBox(width: 12),
 
-                        // Task Title + Metadata Row
+                        // Task Title + Compact Corner Timestamp & +xp Chip
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                task.title,
-                                style: PixelCupertinoTheme.bodyStyle(context)
-                                    .copyWith(
-                                  decoration: task.isCompleted
-                                      ? TextDecoration.lineThrough
-                                      : null,
-                                  color: task.isCompleted
-                                      ? CupertinoDynamicColor.resolve(
-                                          PixelCupertinoTheme.secondaryLabel,
-                                          context,
-                                        )
-                                      : null,
-                                ),
-                              ),
-                              const SizedBox(height: 5),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 4,
-                                crossAxisAlignment: WrapCrossAlignment.center,
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Priority / Ore Tag
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: pColor.withValues(alpha: 0.16),
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(
-                                        color: pColor.withValues(alpha: 0.55),
-                                        width: 1,
-                                      ),
-                                    ),
+                                  Expanded(
                                     child: Text(
-                                      '${task.priority.label.toUpperCase()} · ${task.priority.craftTag}',
+                                      task.title,
                                       style:
-                                          PixelCupertinoTheme.pixelBadgeStyle(
-                                        color: pColor,
-                                        fontSize: 10,
+                                          PixelCupertinoTheme.bodyStyle(context)
+                                              .copyWith(
+                                        decoration: task.isCompleted
+                                            ? TextDecoration.lineThrough
+                                            : null,
+                                        color: task.isCompleted
+                                            ? CupertinoDynamicColor.resolve(
+                                                PixelCupertinoTheme
+                                                    .secondaryLabel,
+                                                context,
+                                              )
+                                            : null,
                                       ),
                                     ),
                                   ),
-                                  if (task.dueDate != null)
-                                    Text(
-                                      _formatDueTimestamp(task.dueDate!),
-                                      style: PixelCupertinoTheme.subheadStyle(
-                                        context,
-                                      ),
+                                  if (cornerTime.isNotEmpty) ...[
+                                    const SizedBox(width: 8),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (task.isAlarmEnabled) ...[
+                                          const PixelSpriteIcon(
+                                            type: PixelSpriteType.alarm,
+                                            size: 11,
+                                            primaryColor:
+                                                PixelCupertinoTheme.diamondCyan,
+                                          ),
+                                          const SizedBox(width: 3),
+                                        ],
+                                        Text(
+                                          cornerTime,
+                                          style: PixelCupertinoTheme
+                                              .pixelBadgeStyle(
+                                            color:
+                                                CupertinoDynamicColor.resolve(
+                                              PixelCupertinoTheme
+                                                  .secondaryLabel,
+                                              context,
+                                            ),
+                                            fontSize: 9.0,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  if (task.isCompleted && task.awardedXp > 0)
-                                    Text(
-                                      '+${task.awardedXp} XP${task.completedOnTime ? ' (ON-TIME)' : ''}',
-                                      style:
-                                          PixelCupertinoTheme.pixelBadgeStyle(
-                                        color: PixelCupertinoTheme.emeraldXp,
-                                        fontSize: 10.5,
-                                      ),
-                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  // Just the Ore Bar Icon + concise +xxp chip
+                                  PixelSpriteIcon(
+                                    type: barSprite,
+                                    size: 13,
+                                    primaryColor: pColor,
+                                    secondaryColor: CupertinoColors.white,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  PixelTagChip(
+                                    label:
+                                        task.isCompleted && task.awardedXp > 0
+                                            ? '+${task.awardedXp}xp'
+                                            : '+${potentialXp}xp',
+                                    color: PixelCupertinoTheme.emeraldXp,
+                                  ),
                                 ],
                               ),
                             ],
                           ),
                         ),
 
-                        // Swipe Hint or Delete Button
-                        if (!task.isCompleted)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 8),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '>>>',
-                                  style: PixelCupertinoTheme.pixelBadgeStyle(
-                                    color: CupertinoDynamicColor.resolve(
-                                      PixelCupertinoTheme.secondaryLabel,
-                                      context,
-                                    ),
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        else if (widget.onDelete != null)
-                          CupertinoButton(
-                            padding: const EdgeInsets.all(4),
-                            minSize: 28,
-                            onPressed: widget.onDelete,
-                            child: const Icon(
-                              CupertinoIcons.trash,
-                              size: 17,
-                              color: PixelCupertinoTheme.redstoneCrimson,
+                        // Three-Dots (`...`) Action Menu Button
+                        CupertinoButton(
+                          padding: const EdgeInsets.only(left: 8),
+                          minSize: 28,
+                          onPressed: () => _showThreeDotsMenu(context),
+                          child: PixelSpriteIcon(
+                            type: PixelSpriteType.dots,
+                            size: 15,
+                            primaryColor: CupertinoDynamicColor.resolve(
+                              PixelCupertinoTheme.secondaryLabel,
+                              context,
                             ),
                           ),
+                        ),
                       ],
                     ),
                   ),

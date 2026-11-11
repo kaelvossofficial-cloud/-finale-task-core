@@ -45,6 +45,10 @@ class TaskItem {
     this.completedAt,
     this.awardedXp = 0,
     this.completedOnTime = false,
+    this.reminderAt,
+    this.isAlarmEnabled = false,
+    this.blockId,
+    this.colorArgb = 0xFFFFAA00,
   });
 
   final String id;
@@ -56,6 +60,10 @@ class TaskItem {
   final DateTime? completedAt;
   final int awardedXp;
   final bool completedOnTime;
+  final DateTime? reminderAt;
+  final bool isAlarmEnabled;
+  final String? blockId;
+  final int colorArgb;
 
   /// Determines chronological section (`Today`, `Upcoming`, `Completed`).
   TaskChronologicalGroup groupFor(DateTime referenceNow) {
@@ -86,6 +94,38 @@ class TaskItem {
     return referenceNow.isAfter(dueDate!);
   }
 
+  /// True when task due time is within the next 60 minutes (or overdue) and incomplete.
+  bool isDueNear(DateTime referenceNow) {
+    if (isCompleted || dueDate == null) return false;
+    final diff = dueDate!.difference(referenceNow).inMinutes;
+    return diff <= 60;
+  }
+
+  /// Concise corner date format: `Nov 11 14:30` (no "Due" prefix).
+  String get shortCornerTimestamp {
+    final target = dueDate ?? reminderAt;
+    if (target == null) return '';
+    const months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final m = months[(target.month - 1).clamp(0, 11)];
+    final d = target.day.toString().padLeft(2, '0');
+    final hh = target.hour.toString().padLeft(2, '0');
+    final mm = target.minute.toString().padLeft(2, '0');
+    return '$m $d $hh:$mm';
+  }
+
   TaskItem copyWith({
     String? id,
     String? title,
@@ -98,6 +138,11 @@ class TaskItem {
     bool clearCompletedAt = false,
     int? awardedXp,
     bool? completedOnTime,
+    DateTime? reminderAt,
+    bool clearReminder = false,
+    bool? isAlarmEnabled,
+    String? blockId,
+    int? colorArgb,
   }) {
     return TaskItem(
       id: id ?? this.id,
@@ -109,6 +154,10 @@ class TaskItem {
       completedAt: clearCompletedAt ? null : (completedAt ?? this.completedAt),
       awardedXp: awardedXp ?? this.awardedXp,
       completedOnTime: completedOnTime ?? this.completedOnTime,
+      reminderAt: clearReminder ? null : (reminderAt ?? this.reminderAt),
+      isAlarmEnabled: isAlarmEnabled ?? this.isAlarmEnabled,
+      blockId: blockId ?? this.blockId,
+      colorArgb: colorArgb ?? this.colorArgb,
     );
   }
 
@@ -123,6 +172,10 @@ class TaskItem {
       'completedAt': completedAt?.toIso8601String(),
       'awardedXp': awardedXp,
       'completedOnTime': completedOnTime ? 1 : 0,
+      'reminderAt': reminderAt?.toIso8601String(),
+      'isAlarmEnabled': isAlarmEnabled ? 1 : 0,
+      'blockId': blockId,
+      'colorArgb': colorArgb,
     };
   }
 
@@ -131,6 +184,8 @@ class TaskItem {
     final isComp = rawCompleted == true || rawCompleted == 1;
     final rawOnTime = json['completedOnTime'];
     final onTime = rawOnTime == true || rawOnTime == 1;
+    final rawAlarm = json['isAlarmEnabled'];
+    final alarm = rawAlarm == true || rawAlarm == 1;
 
     return TaskItem(
       id: json['id'] as String,
@@ -149,6 +204,13 @@ class TaskItem {
           : null,
       awardedXp: (json['awardedXp'] as num?)?.toInt() ?? 0,
       completedOnTime: onTime,
+      reminderAt: json['reminderAt'] != null &&
+              (json['reminderAt'] as String).isNotEmpty
+          ? DateTime.parse(json['reminderAt'] as String)
+          : null,
+      isAlarmEnabled: alarm,
+      blockId: json['blockId'] as String?,
+      colorArgb: (json['colorArgb'] as num?)?.toInt() ?? 0xFFFFAA00,
     );
   }
 }

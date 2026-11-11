@@ -13,6 +13,15 @@ class HabitsViewModel extends ChangeNotifier {
 
   final TaskHabitRepository _repository;
 
+  bool _isWaterfallGrid = false;
+  bool get isWaterfallGrid => _isWaterfallGrid;
+
+  void toggleLayoutMode() {
+    _repository.haptics.lightImpact();
+    _isWaterfallGrid = !_isWaterfallGrid;
+    notifyListeners();
+  }
+
   List<HabitItem> get habits => _repository.habits;
   List<HabitItem> get activeHabits =>
       _repository.habits.where((h) => h.isActive).toList();
@@ -46,23 +55,53 @@ class HabitsViewModel extends ChangeNotifier {
     return habit.isCompletedOn(today);
   }
 
-  Future<void> toggleToday(String habitId) async {
-    await _repository.toggleHabitCompletion(habitId, date: today);
+  Future<void> refresh() async {
+    await _repository.refreshState();
+  }
+
+  Future<void> toggleToday(String habitId, {String? optionalNote}) async {
+    await _repository.toggleHabitCompletion(
+      habitId,
+      date: today,
+      optionalNote: optionalNote,
+    );
   }
 
   Future<void> toggleDate(String habitId, DateTime date) async {
     await _repository.toggleHabitCompletion(habitId, date: date);
   }
 
+  Future<void> addStoryNote(String habitId, String note) async {
+    await _repository.addHabitStoryNote(
+      habitId: habitId,
+      note: note,
+      date: today,
+    );
+  }
+
   Future<void> addHabit({
     required String title,
     required int gracePeriodDays,
+    String iconKey = 'potion',
+    int colorArgb = HabitItem.defaultColorArgb,
+    String blockId = 'dawn',
+    String? reminderTime,
+    bool isAlarmEnabled = false,
   }) async {
     await _repository.haptics.lightImpact();
     await _repository.addHabit(
       title: title,
       gracePeriodDays: gracePeriodDays,
+      iconKey: iconKey,
+      colorArgb: colorArgb,
+      blockId: blockId,
+      reminderTime: reminderTime,
+      isAlarmEnabled: isAlarmEnabled,
     );
+  }
+
+  Future<void> updateHabit(HabitItem updated) async {
+    await _repository.updateHabit(updated);
   }
 
   Future<void> deleteHabit(String habitId) async {

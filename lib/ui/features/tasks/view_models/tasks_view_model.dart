@@ -62,26 +62,43 @@ class TasksViewModel extends ChangeNotifier {
     return priorityCompare;
   }
 
+  Future<void> refresh() async {
+    await _repository.refreshState();
+  }
+
   Future<void> addTask({
     required String title,
     DateTime? dueDate,
     required TaskPriority priority,
+    DateTime? reminderAt,
+    bool isAlarmEnabled = false,
+    String? blockId,
   }) async {
     await _repository.haptics.lightImpact();
     await _repository.addTask(
       title: title,
       dueDate: dueDate,
       priority: priority,
+      reminderAt: reminderAt,
+      isAlarmEnabled: isAlarmEnabled,
+      blockId: blockId,
     );
+  }
+
+  Future<void> updateTask(TaskItem updated) async {
+    await _repository.updateTask(updated);
+  }
+
+  Future<void> delayTask(String taskId, Duration delay) async {
+    await _repository.delayTask(taskId, delay);
   }
 
   Future<void> completeTask(TaskItem task) async {
     final result = await _repository.completeTask(task.id);
     if (result.awardedXp > 0) {
-      final bonusLabel = result.onTime ? ' (+5 ON-TIME BONUS!)' : '';
       final levelUpLabel =
-          result.leveledUp ? ' · LEVEL UP TO LVL ${progression.level}!' : '';
-      _lastRewardBanner = '+${result.awardedXp} XP$bonusLabel$levelUpLabel';
+          result.leveledUp ? ' · LVL ${progression.level}!' : '';
+      _lastRewardBanner = '+${result.awardedXp}xp$levelUpLabel';
       notifyListeners();
     }
   }

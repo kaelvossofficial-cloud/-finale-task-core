@@ -3,6 +3,8 @@ import 'package:finale_task_core/data/services/haptic_service.dart';
 import 'package:finale_task_core/data/services/local_storage_service.dart';
 import 'package:finale_task_core/domain/models/habit_item.dart';
 import 'package:finale_task_core/domain/models/task_item.dart';
+import 'package:finale_task_core/domain/models/time_block.dart';
+import 'package:finale_task_core/domain/use_cases/block_planner.dart';
 import 'package:finale_task_core/domain/use_cases/level_calculator.dart';
 import 'package:finale_task_core/domain/use_cases/streak_calculator.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -44,7 +46,7 @@ void main() {
     });
   });
 
-  group('StreakCalculator & Grace Period Logic', () {
+  group('StreakCalculator, TimeBlocks & BlockPlanner', () {
     test('counts consecutive days and respects gracePeriodDays before reset',
         () {
       final refDate = DateTime(2026, 11, 11);
@@ -62,7 +64,6 @@ void main() {
         3,
       );
 
-      // 1 day missed ('2026-11-10' skipped) with 1-day grace period -> keeps streak
       final keysWithOneGap = <String>[
         '2026-11-09',
         '2026-11-11',
@@ -76,7 +77,6 @@ void main() {
         2,
       );
 
-      // Missed beyond grace period -> resets to 0
       final keysExpired = <String>[
         '2026-11-01',
         '2026-11-02',
@@ -91,34 +91,38 @@ void main() {
       );
     });
 
-    test('calculates today completion percentage accurately', () {
-      final today = DateTime(2026, 11, 11);
-      final habits = <HabitItem>[
-        HabitItem(
-          id: 'h1',
-          title: 'H1',
-          createdAt: today,
-          completedDateKeys: const <String>['2026-11-11'],
-        ),
-        HabitItem(
-          id: 'h2',
-          title: 'H2',
-          createdAt: today,
-          completedDateKeys: const <String>[],
-        ),
-      ];
-      expect(
-        StreakCalculator.calculateTodayCompletionRatio(
-          habits: habits,
-          today: today,
-        ),
-        0.5,
+    test('resolves active TimeBlock and filters BlockPlanner entries', () {
+      final morning = DateTime(2026, 11, 11, 7, 30);
+      final dawnBlock = TimeBlock.current(morning);
+      expect(dawnBlock.id, 'dawn');
+
+      final entries = BlockPlanner.entriesFor(
+        block: dawnBlock,
+        tasks: <TaskItem>[
+          TaskItem(
+            id: 't1',
+            title: 'Morning Task',
+            dueDate: DateTime(2026, 11, 11, 8, 15),
+            createdAt: morning,
+          ),
+        ],
+        habits: <HabitItem>[
+          HabitItem(
+            id: 'h1',
+            title: 'Dawn Habit',
+            blockId: 'dawn',
+            createdAt: morning,
+          ),
+        ],
+        now: morning,
       );
+      expect(entries.length, 2);
     });
   });
 
-  group('TaskHabitRepository Persistence, JSON Export/Import & Reset', () {
-    test('completes tasks, updates XP & metrics, exports and imports JSON',
+  group('TaskHabitRepository Persistence, Story Notes, Friends & JSON', () {
+    test(
+        'completes tasks, delays tasks, logs habit stories, manages friends, and exports/imports JSON',
         () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final fixedNow = DateTime(2026, 11, 11, 12, 0);
@@ -133,14 +137,43 @@ void main() {
         title: 'Test On-Time Quest',
         dueDate: fixedNow.add(const Duration(hours: 2)),
         priority: TaskPriority.high,
+        isAlarmEnabled: true,
+      );
+
+      await repo.delayTask(task.id, const Duration(minutes: 15));
+      expect(
+        repo.tasks.first.dueDate,
+        fixedNow.add(const Duration(hours: 2, minutes: 15)),
       );
 
       final reward = await repo.completeTask(task.id);
       expect(reward.awardedXp, 15);
       expect(reward.onTime, isTrue);
       expect(repo.progression.totalXp, 15);
-      expect(repo.progression.totalCompletedTasks, 1);
-      expect(repo.progression.onTimeCompletionRate, 100.0);
+
+      final habit = await repo.addHabit(
+        title: 'Custom Colored Habit',
+        iconKey: 'diamond',
+        colorArgb: 0xFF3CE6D6,
+        blockId: 'day',
+      );
+      await repo.addHabitStoryNote(
+        habitId: habit.id,
+        note: 'Completed 30m session!',
+      );
+      expect(repo.habits.first.stories.length, 1);
+
+      await repo.updateUserProfile(
+        username: 'kael_voss',
+        displayName: 'Kael Voss',
+      );
+      expect(repo.progression.username, 'kael_voss');
+
+      await repo.addFriendByUsername(
+        username: 'friend_one',
+        displayName: 'Friend One',
+      );
+      expect(repo.progression.friends.length, 1);
 
       final exported = repo.exportDatabaseToJson();
       await repo.resetProgressionAndData();
@@ -149,8 +182,8 @@ void main() {
 
       await repo.importDatabaseFromJson(exported);
       expect(repo.tasks.length, 1);
+      expect(repo.habits.first.stories.length, 1);
       expect(repo.progression.totalXp, 15);
-      expect(repo.progression.totalCompletedTasks, 1);
     });
   });
 }

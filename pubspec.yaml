@@ -1,7 +1,7 @@
 name: finale_task_core
-description: "Finale Task Core - High-response Cupertino-styled task and habit engine targeting Android SDK 34+ and iOS."
+description: "Finale Task Core - Pixel-art Cupertino task and habit engine for Android SDK 34+ and iOS."
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -19,7 +19,12 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
-  sqflite_common_ffi: ^2.3.3
 
 flutter:
   uses-material-design: false
+  fonts:
+    - family: Silkscreen
+      fonts:
+        - asset: assets/fonts/Silkscreen-Regular.ttf
+        - asset: assets/fonts/Silkscreen-Bold.ttf
+          weight: 700

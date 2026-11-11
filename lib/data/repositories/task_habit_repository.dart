@@ -3,13 +3,14 @@ import 'package:flutter/foundation.dart';
 
 import '../../domain/models/habit_item.dart';
 import '../../domain/models/task_item.dart';
+import '../../domain/models/time_block.dart';
 import '../../domain/models/user_progression.dart';
 import '../../domain/use_cases/level_calculator.dart';
 import '../../domain/use_cases/streak_calculator.dart';
 import '../services/haptic_service.dart';
 import '../services/local_storage_service.dart';
 
-/// Single source of truth for Tasks, Habits, and Progression in Finale Task Core.
+/// Single source of truth for Tasks, Habits, TimeBlocks, Reminders, and Progression.
 class TaskHabitRepository extends ChangeNotifier {
   TaskHabitRepository({
     required LocalStorageService storageService,
@@ -50,9 +51,47 @@ class TaskHabitRepository extends ChangeNotifier {
       await _seedStarterWorld();
     }
 
+    if (seedDefaultsIfEmpty && _progression.friends.isEmpty) {
+      _progression = _progression.copyWith(
+        friends: const <AccountabilityFriend>[
+          AccountabilityFriend(
+            username: 'aria_redstone',
+            displayName: 'Aria V.',
+            streakDays: 6,
+            weeklyXp: 145,
+            avatarIconKey: 'diamond',
+            colorArgb: 0xFF3CE6D6,
+          ),
+          AccountabilityFriend(
+            username: 'zack_nether',
+            displayName: 'Zack M.',
+            streakDays: 4,
+            weeklyXp: 110,
+            avatarIconKey: 'sword',
+            colorArgb: 0xFFFFAA00,
+          ),
+          AccountabilityFriend(
+            username: 'mira_alchemist',
+            displayName: 'Mira K.',
+            streakDays: 3,
+            weeklyXp: 85,
+            avatarIconKey: 'potion',
+            colorArgb: 0xFFA855F7,
+          ),
+        ],
+      );
+      await _storage.saveProgression(_progression);
+    }
+
     _haptics.setEnabled(_progression.hapticsEnabled);
     _recomputeTaskStreak();
     _isInitialized = true;
+    notifyListeners();
+  }
+
+  Future<void> refreshState() async {
+    await _haptics.lightImpact();
+    _recomputeTaskStreak();
     notifyListeners();
   }
 
@@ -61,20 +100,30 @@ class TaskHabitRepository extends ChangeNotifier {
     final todayKey = HabitItem.dateKey(current);
     final yesterdayKey =
         HabitItem.dateKey(current.subtract(const Duration(days: 1)));
+    final twoDaysAgoKey =
+        HabitItem.dateKey(current.subtract(const Duration(days: 2)));
+    final activeBlock = TimeBlock.current(current).id;
 
     _tasks = <TaskItem>[
       TaskItem(
         id: 'task_seed_1',
         title: 'Mine 32 Deep-Slate Architecture Specs',
-        dueDate: current.add(const Duration(hours: 3)),
+        dueDate: current.add(const Duration(minutes: 45)),
+        reminderAt: current.add(const Duration(minutes: 30)),
+        isAlarmEnabled: true,
         priority: TaskPriority.high,
+        blockId: activeBlock,
+        colorArgb: 0xFFFF3B30,
         createdAt: current.subtract(const Duration(hours: 2)),
       ),
       TaskItem(
         id: 'task_seed_2',
         title: 'Craft Enchanted Sprint Backlog Table',
-        dueDate: current.add(const Duration(hours: 6)),
+        dueDate: current.add(const Duration(hours: 4)),
+        reminderAt: current.add(const Duration(hours: 3, minutes: 30)),
         priority: TaskPriority.medium,
+        blockId: activeBlock,
+        colorArgb: 0xFFFFAA00,
         createdAt: current.subtract(const Duration(hours: 1)),
       ),
       TaskItem(
@@ -82,6 +131,8 @@ class TaskHabitRepository extends ChangeNotifier {
         title: 'Smelt Raw Iron Bugs in Hotbar Queue',
         dueDate: current.add(const Duration(days: 2, hours: 4)),
         priority: TaskPriority.low,
+        blockId: 'day',
+        colorArgb: 0xFF9CA3AF,
         createdAt: current,
       ),
       TaskItem(
@@ -89,6 +140,8 @@ class TaskHabitRepository extends ChangeNotifier {
         title: 'Fortify Stronghold CI/CD Redstone Gate',
         dueDate: current.add(const Duration(days: 4)),
         priority: TaskPriority.high,
+        blockId: 'dusk',
+        colorArgb: 0xFFFF3B30,
         createdAt: current,
       ),
     ];
@@ -96,22 +149,53 @@ class TaskHabitRepository extends ChangeNotifier {
     _habits = <HabitItem>[
       HabitItem(
         id: 'habit_seed_1',
-        title: 'Brew Morning Swiftness Potion (Hydrate)',
+        title: 'Brew Morning Swiftness Potion',
+        iconKey: 'potion',
+        colorArgb: 0xFF17DD62,
+        blockId: 'dawn',
+        reminderTime: '07:30',
+        isAlarmEnabled: true,
         gracePeriodDays: 1,
-        completedDateKeys: <String>[yesterdayKey, todayKey],
+        completedDateKeys: <String>[twoDaysAgoKey, yesterdayKey, todayKey],
+        stories: <HabitStoryEntry>[
+          HabitStoryEntry(
+            dateKey: todayKey,
+            note: 'Drank 500ml water + electrolytes before opening IDE.',
+            timestamp: current.subtract(const Duration(hours: 1)),
+          ),
+        ],
         createdAt: current.subtract(const Duration(days: 5)),
       ),
       HabitItem(
         id: 'habit_seed_2',
-        title: 'Redstone Logic Practice (30m Deep Focus)',
+        title: 'Redstone Logic Practice (30m Focus)',
+        iconKey: 'code',
+        colorArgb: 0xFF3CE6D6,
+        blockId: activeBlock,
+        reminderTime: '13:00',
         gracePeriodDays: 1,
-        completedDateKeys: <String>[yesterdayKey],
+        completedDateKeys: <String>[twoDaysAgoKey, yesterdayKey],
         createdAt: current.subtract(const Duration(days: 4)),
       ),
       HabitItem(
         id: 'habit_seed_3',
-        title: 'Read Enchanted Tome in Library (20 Pages)',
+        title: 'Read Enchanted Tome in Library',
+        iconKey: 'book',
+        colorArgb: 0xFFA855F7,
+        blockId: 'dusk',
+        reminderTime: '20:00',
         gracePeriodDays: 2,
+        completedDateKeys: <String>[yesterdayKey],
+        createdAt: current.subtract(const Duration(days: 3)),
+      ),
+      HabitItem(
+        id: 'habit_seed_4',
+        title: 'Campfire Rest & Device Shutdown',
+        iconKey: 'moon',
+        colorArgb: 0xFFFFAA00,
+        blockId: 'night',
+        reminderTime: '22:30',
+        gracePeriodDays: 1,
         completedDateKeys: <String>[yesterdayKey],
         createdAt: current.subtract(const Duration(days: 3)),
       ),
@@ -128,23 +212,61 @@ class TaskHabitRepository extends ChangeNotifier {
     required String title,
     DateTime? dueDate,
     TaskPriority priority = TaskPriority.medium,
+    DateTime? reminderAt,
+    bool isAlarmEnabled = false,
+    String? blockId,
   }) async {
     final trimmed = title.trim();
     if (trimmed.isEmpty) {
       throw ArgumentError('Task title cannot be empty.');
     }
     final current = _clock();
+    final color = switch (priority) {
+      TaskPriority.high => 0xFFFF3B30,
+      TaskPriority.medium => 0xFFFFAA00,
+      TaskPriority.low => 0xFF9CA3AF,
+    };
     final task = TaskItem(
       id: 'task_${current.microsecondsSinceEpoch}',
       title: trimmed,
       dueDate: dueDate,
       priority: priority,
+      reminderAt: reminderAt ?? dueDate,
+      isAlarmEnabled: isAlarmEnabled,
+      blockId: blockId ?? TimeBlock.current(dueDate ?? current).id,
+      colorArgb: color,
       createdAt: current,
     );
     _tasks = <TaskItem>[task, ..._tasks];
     await _storage.saveTasks(_tasks);
     notifyListeners();
     return task;
+  }
+
+  /// Updates an existing task (title, dueDate, reminderAt, alarm, priority, blockId).
+  Future<void> updateTask(TaskItem updated) async {
+    final idx = _tasks.indexWhere((t) => t.id == updated.id);
+    if (idx == -1) return;
+    final list = List<TaskItem>.from(_tasks);
+    list[idx] = updated;
+    _tasks = list;
+    await _storage.saveTasks(_tasks);
+    await _haptics.lightImpact();
+    notifyListeners();
+  }
+
+  /// Delays a task by [duration] (used by left-swipe on Home drum picker or quick actions).
+  Future<void> delayTask(String taskId, Duration duration) async {
+    final idx = _tasks.indexWhere((t) => t.id == taskId);
+    if (idx == -1) return;
+    final existing = _tasks[idx];
+    final baseTime = existing.dueDate ?? _clock();
+    final nextDue = baseTime.add(duration);
+    final updated = existing.copyWith(
+      dueDate: nextDue,
+      reminderAt: nextDue,
+    );
+    await updateTask(updated);
   }
 
   /// Marks a task complete via the tactile dismiss gesture, awards XP (+10 base, +5 on-time bonus),
@@ -229,10 +351,15 @@ class TaskHabitRepository extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Creates a new daily habit with configurable grace period.
+  /// Creates a new daily habit with custom icon, color, block, reminder, and grace period.
   Future<HabitItem> addHabit({
     required String title,
     int gracePeriodDays = 1,
+    String iconKey = 'potion',
+    int colorArgb = HabitItem.defaultColorArgb,
+    String blockId = 'dawn',
+    String? reminderTime,
+    bool isAlarmEnabled = false,
   }) async {
     final trimmed = title.trim();
     if (trimmed.isEmpty) {
@@ -243,6 +370,11 @@ class TaskHabitRepository extends ChangeNotifier {
       id: 'habit_${current.microsecondsSinceEpoch}',
       title: trimmed,
       gracePeriodDays: gracePeriodDays.clamp(0, 7),
+      iconKey: iconKey,
+      colorArgb: colorArgb,
+      blockId: blockId,
+      reminderTime: reminderTime,
+      isAlarmEnabled: isAlarmEnabled,
       createdAt: current,
     );
     _habits = <HabitItem>[..._habits, habit];
@@ -251,10 +383,70 @@ class TaskHabitRepository extends ChangeNotifier {
     return habit;
   }
 
+  /// Updates an existing habit's customization fields.
+  Future<void> updateHabit(HabitItem updated) async {
+    final idx = _habits.indexWhere((h) => h.id == updated.id);
+    if (idx == -1) return;
+    final list = List<HabitItem>.from(_habits);
+    list[idx] = updated;
+    _habits = list;
+    await _storage.saveHabits(_habits);
+    await _haptics.lightImpact();
+    notifyListeners();
+  }
+
+  /// Snoozes/delays a habit on the Home drum picker by [duration].
+  Future<void> delayHabit(String habitId, Duration duration) async {
+    final idx = _habits.indexWhere((h) => h.id == habitId);
+    if (idx == -1) return;
+    final updated = _habits[idx].copyWith(
+      snoozedUntil: _clock().add(duration),
+    );
+    await updateHabit(updated);
+  }
+
+  /// Adds an optional daily story/note to a habit and marks it complete for today if not already.
+  Future<void> addHabitStoryNote({
+    required String habitId,
+    required String note,
+    DateTime? date,
+  }) async {
+    final targetDate = date ?? _clock();
+    final key = HabitItem.dateKey(targetDate);
+    final idx = _habits.indexWhere((h) => h.id == habitId);
+    if (idx == -1) return;
+
+    final habit = _habits[idx];
+    final keys = Set<String>.from(habit.completedDateKeys)..add(key);
+    final trimmedNote = note.trim();
+    final updatedStories = <HabitStoryEntry>[
+      if (trimmedNote.isNotEmpty)
+        HabitStoryEntry(
+          dateKey: key,
+          note: trimmedNote,
+          timestamp: _clock(),
+        ),
+      ...habit.stories,
+    ];
+
+    final updatedHabit = habit.copyWith(
+      completedDateKeys: keys.toList(),
+      stories: updatedStories,
+    );
+    final updatedList = List<HabitItem>.from(_habits);
+    updatedList[idx] = updatedHabit;
+    _habits = updatedList;
+
+    await _storage.saveHabits(_habits);
+    await _haptics.lightImpact();
+    notifyListeners();
+  }
+
   /// Toggles a habit's completion status for [date] (defaults to today).
   Future<bool> toggleHabitCompletion(
     String habitId, {
     DateTime? date,
+    String? optionalNote,
   }) async {
     final targetDate = date ?? _clock();
     final key = HabitItem.dateKey(targetDate);
@@ -272,8 +464,23 @@ class TaskHabitRepository extends ChangeNotifier {
       nowCompleted = true;
     }
 
+    var updatedStories = habit.stories;
+    if (nowCompleted &&
+        optionalNote != null &&
+        optionalNote.trim().isNotEmpty) {
+      updatedStories = <HabitStoryEntry>[
+        HabitStoryEntry(
+          dateKey: key,
+          note: optionalNote.trim(),
+          timestamp: _clock(),
+        ),
+        ...habit.stories,
+      ];
+    }
+
     final updatedHabit = habit.copyWith(
       completedDateKeys: keys.toList(),
+      stories: updatedStories,
     );
 
     final updatedList = List<HabitItem>.from(_habits);
@@ -306,6 +513,77 @@ class TaskHabitRepository extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Updates the user's unique @username, displayName, and avatarIconKey.
+  Future<void> updateUserProfile({
+    required String username,
+    required String displayName,
+    String? avatarIconKey,
+  }) async {
+    final cleanUsername = username
+        .trim()
+        .toLowerCase()
+        .replaceAll('@', '')
+        .replaceAll(RegExp(r'[^a-z0-9_]'), '_');
+    if (cleanUsername.isEmpty) return;
+
+    _progression = _progression.copyWith(
+      username: cleanUsername,
+      displayName:
+          displayName.trim().isEmpty ? cleanUsername : displayName.trim(),
+      avatarIconKey: avatarIconKey ?? _progression.avatarIconKey,
+    );
+    await _storage.saveProgression(_progression);
+    await _haptics.lightImpact();
+    notifyListeners();
+  }
+
+  /// Adds an accountability friend by unique username to compete on habits & XP.
+  Future<void> addFriendByUsername({
+    required String username,
+    String? displayName,
+    String avatarIconKey = 'diamond',
+    int colorArgb = 0xFF17DD62,
+  }) async {
+    final clean = username
+        .trim()
+        .toLowerCase()
+        .replaceAll('@', '')
+        .replaceAll(RegExp(r'[^a-z0-9_]'), '_');
+    if (clean.isEmpty) return;
+    if (_progression.friends.any((f) => f.username == clean)) return;
+
+    final newFriend = AccountabilityFriend(
+      username: clean,
+      displayName: (displayName == null || displayName.trim().isEmpty)
+          ? clean.toUpperCase()
+          : displayName.trim(),
+      streakDays: 3,
+      weeklyXp: 90,
+      avatarIconKey: avatarIconKey,
+      colorArgb: colorArgb,
+    );
+    _progression = _progression.copyWith(
+      friends: <AccountabilityFriend>[..._progression.friends, newFriend],
+    );
+    await _storage.saveProgression(_progression);
+    await _haptics.mediumImpact();
+    notifyListeners();
+  }
+
+  /// Sends a habit accountability nudge to a friend.
+  Future<void> nudgeFriend(String username) async {
+    final updated = _progression.friends.map((f) {
+      if (f.username == username) {
+        return f.copyWith(nudgedToday: true);
+      }
+      return f;
+    }).toList();
+    _progression = _progression.copyWith(friends: updated);
+    await _storage.saveProgression(_progression);
+    await _haptics.lightImpact();
+    notifyListeners();
+  }
+
   /// Updates haptic feedback preference and persists immediately.
   Future<void> setHapticsEnabled(bool enabled) async {
     _haptics.setEnabled(enabled);
@@ -320,7 +598,7 @@ class TaskHabitRepository extends ChangeNotifier {
   /// Exports the entire database (tasks, habits, progression) to a formatted JSON string.
   String exportDatabaseToJson() {
     final payload = <String, dynamic>{
-      'schemaVersion': 1,
+      'schemaVersion': 2,
       'app': 'Finale Task Core',
       'exportedAt': _clock().toIso8601String(),
       'progression': _progression.toJson(),

@@ -8,8 +8,8 @@ import '../../domain/models/habit_item.dart';
 import '../../domain/models/task_item.dart';
 import '../../domain/models/user_progression.dart';
 
-/// Offline-first persistence service backed by SQLite (`sqflite`) on Android/iOS
-/// and synchronized with `SharedPreferences` for instant snapshot export/import and test compatibility.
+/// Offline-first persistence service backed by SQLite (`sqflite` v2) on Android/iOS
+/// and synchronized with `SharedPreferences` for snapshot export/import and widget sync.
 class LocalStorageService {
   LocalStorageService({this.enableSqlite = true});
 
@@ -32,7 +32,7 @@ class LocalStorageService {
       final dbPath = p.join(dbDir, 'finale_task_core.db');
       _db = await openDatabase(
         dbPath,
-        version: 1,
+        version: 2,
         onCreate: (db, version) async {
           await db.execute('''
             CREATE TABLE tasks (
@@ -44,7 +44,11 @@ class LocalStorageService {
               createdAt TEXT NOT NULL,
               completedAt TEXT,
               awardedXp INTEGER NOT NULL,
-              completedOnTime INTEGER NOT NULL
+              completedOnTime INTEGER NOT NULL,
+              reminderAt TEXT,
+              isAlarmEnabled INTEGER NOT NULL DEFAULT 0,
+              blockId TEXT,
+              colorArgb INTEGER NOT NULL DEFAULT 4294945280
             )
           ''');
           await db.execute('''
@@ -54,13 +58,41 @@ class LocalStorageService {
               isActive INTEGER NOT NULL,
               gracePeriodDays INTEGER NOT NULL,
               completedDateKeys TEXT NOT NULL,
-              createdAt TEXT NOT NULL
+              createdAt TEXT NOT NULL,
+              iconKey TEXT NOT NULL DEFAULT 'potion',
+              colorArgb INTEGER NOT NULL DEFAULT 4279754082,
+              blockId TEXT,
+              reminderTime TEXT,
+              isAlarmEnabled INTEGER NOT NULL DEFAULT 0,
+              snoozedUntil TEXT,
+              stories TEXT NOT NULL DEFAULT '[]'
             )
           ''');
         },
+        onUpgrade: (db, oldVersion, newVersion) async {
+          if (oldVersion < 2) {
+            final alterStatements = <String>[
+              'ALTER TABLE tasks ADD COLUMN reminderAt TEXT',
+              'ALTER TABLE tasks ADD COLUMN isAlarmEnabled INTEGER NOT NULL DEFAULT 0',
+              'ALTER TABLE tasks ADD COLUMN blockId TEXT',
+              'ALTER TABLE tasks ADD COLUMN colorArgb INTEGER NOT NULL DEFAULT 4294945280',
+              "ALTER TABLE habits ADD COLUMN iconKey TEXT NOT NULL DEFAULT 'potion'",
+              'ALTER TABLE habits ADD COLUMN colorArgb INTEGER NOT NULL DEFAULT 4279754082',
+              'ALTER TABLE habits ADD COLUMN blockId TEXT',
+              'ALTER TABLE habits ADD COLUMN reminderTime TEXT',
+              'ALTER TABLE habits ADD COLUMN isAlarmEnabled INTEGER NOT NULL DEFAULT 0',
+              'ALTER TABLE habits ADD COLUMN snoozedUntil TEXT',
+              "ALTER TABLE habits ADD COLUMN stories TEXT NOT NULL DEFAULT '[]'",
+            ];
+            for (final sql in alterStatements) {
+              try {
+                await db.execute(sql);
+              } catch (_) {}
+            }
+          }
+        },
       );
     } catch (_) {
-      // Fallback to SharedPreferences when running in headless widget tests or desktop without FFI.
       _db = null;
     }
   }
@@ -77,6 +109,15 @@ class LocalStorageService {
 
   Future<List<TaskItem>> loadTasks() async {
     _prefs ??= await SharedPreferences.getInstance();
+    final raw = _prefs!.getString(_tasksPrefsKey);
+    if (raw != null && raw.isNotEmpty) {
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      return decoded
+          .map((item) =>
+              TaskItem.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList();
+    }
+
     if (_db != null) {
       try {
         final rows = await _db!.query('tasks', orderBy: 'createdAt DESC');
@@ -86,13 +127,7 @@ class LocalStorageService {
       } catch (_) {}
     }
 
-    final raw = _prefs!.getString(_tasksPrefsKey);
-    if (raw == null || raw.isEmpty) return <TaskItem>[];
-    final decoded = jsonDecode(raw) as List<dynamic>;
-    return decoded
-        .map(
-            (item) => TaskItem.fromJson(Map<String, dynamic>.from(item as Map)))
-        .toList();
+    return <TaskItem>[];
   }
 
   Future<void> saveTasks(List<TaskItem> tasks) async {
@@ -118,6 +153,15 @@ class LocalStorageService {
 
   Future<List<HabitItem>> loadHabits() async {
     _prefs ??= await SharedPreferences.getInstance();
+    final raw = _prefs!.getString(_habitsPrefsKey);
+    if (raw != null && raw.isNotEmpty) {
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      return decoded
+          .map((item) =>
+              HabitItem.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList();
+    }
+
     if (_db != null) {
       try {
         final rows = await _db!.query('habits', orderBy: 'createdAt ASC');
@@ -127,13 +171,7 @@ class LocalStorageService {
       } catch (_) {}
     }
 
-    final raw = _prefs!.getString(_habitsPrefsKey);
-    if (raw == null || raw.isEmpty) return <HabitItem>[];
-    final decoded = jsonDecode(raw) as List<dynamic>;
-    return decoded
-        .map((item) =>
-            HabitItem.fromJson(Map<String, dynamic>.from(item as Map)))
-        .toList();
+    return <HabitItem>[];
   }
 
   Future<void> saveHabits(List<HabitItem> habits) async {

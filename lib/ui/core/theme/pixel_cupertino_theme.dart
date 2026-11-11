@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 /// Combines Apple HIG Dynamic Colors & SF Pro typography rules (`-0.41` body, `-0.78` headlines)
-/// with a Minecraft-inspired Voxel / Pixel-Art palette (Obsidian/Deepslate Dark & Birch/Sandstone Light).
+/// with the Silkscreen Pixel Font and a Minecraft Voxel palette.
 class PixelCupertinoTheme {
   const PixelCupertinoTheme._();
 
@@ -26,8 +26,8 @@ class PixelCupertinoTheme {
 
   static const CupertinoDynamicColor translucentBarBackground =
       CupertinoDynamicColor.withBrightness(
-    color: Color(0xCCF2EFE9),
-    darkColor: Color(0xCC1B1E24),
+    color: Color(0xD9F2EFE9),
+    darkColor: Color(0xD91B1E24),
   );
 
   static const CupertinoDynamicColor primaryLabel =
@@ -69,12 +69,38 @@ class PixelCupertinoTheme {
   static const Color redstoneCrimson = Color(0xFFFF3B30);
   static const Color amethystPurple = Color(0xFFA855F7);
   static const Color ironIngot = Color(0xFF9CA3AF);
+  static const Color lapisBlue = Color(0xFF3B82F6);
+  static const Color copperOrange = Color(0xFFF97316);
+  static const Color sakuraPink = Color(0xFFEC4899);
+
+  /// Custom color palette swatches for Habits & Blocks.
+  static const List<int> habitPaletteArgb = <int>[
+    0xFF17DD62, // Emerald
+    0xFF3CE6D6, // Diamond
+    0xFFFFAA00, // Gold
+    0xFFFF3B30, // Redstone
+    0xFFA855F7, // Amethyst
+    0xFF3B82F6, // Lapis
+    0xFFF97316, // Copper
+    0xFFEC4899, // Sakura
+  ];
+
+  /// Precomputed glow shadows for active controls and screen transitions.
+  static List<BoxShadow> glowShadows(Color color, {double intensity = 0.45}) {
+    return <BoxShadow>[
+      BoxShadow(
+        color: color.withValues(alpha: intensity.clamp(0.0, 1.0)),
+        blurRadius: 12,
+        spreadRadius: 1,
+      ),
+    ];
+  }
 
   // Typography following iOS HIG Dynamic Type scale & exact letterSpacing rules
   static TextStyle largeTitleStyle(BuildContext context) {
     return TextStyle(
       fontFamily: '.SF Pro Display',
-      fontSize: 30,
+      fontSize: 28,
       fontWeight: FontWeight.w700,
       letterSpacing: -0.78,
       color: CupertinoDynamicColor.resolve(primaryLabel, context),
@@ -84,7 +110,7 @@ class PixelCupertinoTheme {
   static TextStyle headlineStyle(BuildContext context) {
     return TextStyle(
       fontFamily: '.SF Pro Display',
-      fontSize: 19,
+      fontSize: 18,
       fontWeight: FontWeight.w600,
       letterSpacing: -0.78,
       color: CupertinoDynamicColor.resolve(primaryLabel, context),
@@ -104,7 +130,7 @@ class PixelCupertinoTheme {
   static TextStyle bodyStyle(BuildContext context) {
     return TextStyle(
       fontFamily: '.SF Pro Text',
-      fontSize: 16,
+      fontSize: 15.5,
       fontWeight: FontWeight.w500,
       letterSpacing: -0.41,
       color: CupertinoDynamicColor.resolve(primaryLabel, context),
@@ -114,22 +140,23 @@ class PixelCupertinoTheme {
   static TextStyle subheadStyle(BuildContext context) {
     return TextStyle(
       fontFamily: '.SF Pro Text',
-      fontSize: 13,
+      fontSize: 12.5,
       fontWeight: FontWeight.w400,
       letterSpacing: -0.41,
       color: CupertinoDynamicColor.resolve(secondaryLabel, context),
     );
   }
 
+  /// Uses bundled `Silkscreen` pixel font for numbers, XP chips, and badges.
   static TextStyle pixelBadgeStyle({
     Color color = emeraldXp,
-    double fontSize = 11,
+    double fontSize = 10.5,
   }) {
     return TextStyle(
-      fontFamily: 'Courier',
+      fontFamily: 'Silkscreen',
       fontSize: fontSize,
       fontWeight: FontWeight.w700,
-      letterSpacing: 0.6,
+      height: 1.1,
       color: color,
     );
   }
@@ -156,7 +183,7 @@ class PixelCupertinoTheme {
         ),
         navLargeTitleTextStyle: TextStyle(
           fontFamily: '.SF Pro Display',
-          fontSize: 30,
+          fontSize: 28,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.78,
           color: primaryLabel,

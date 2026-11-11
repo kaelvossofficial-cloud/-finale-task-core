@@ -40,14 +40,12 @@ class FrostedSheetContainer extends StatelessWidget {
             borderRadius: const BorderRadius.vertical(
               top: Radius.circular(16),
             ),
-            border: Border(
-              top: BorderSide(
-                color: CupertinoDynamicColor.resolve(
-                  PixelCupertinoTheme.bevelHighlight,
-                  context,
-                ),
-                width: 1.5,
+            border: Border.all(
+              color: CupertinoDynamicColor.resolve(
+                PixelCupertinoTheme.bevelHighlight,
+                context,
               ),
+              width: 1.5,
             ),
           ),
           child: SafeArea(

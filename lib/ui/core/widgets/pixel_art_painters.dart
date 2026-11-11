@@ -4,11 +4,34 @@ import '../theme/pixel_cupertino_theme.dart';
 enum PixelSpriteType {
   xpOrb,
   pickaxe,
+  craftAxe,
+  sword,
+  shield,
+  goldBar,
+  ironBar,
+  redstoneBar,
+  diamond,
+  potion,
+  book,
   flame,
   crown,
   chest,
   checkmark,
   heart,
+  sunrise,
+  sun,
+  sunset,
+  moon,
+  star,
+  bell,
+  alarm,
+  calendar,
+  code,
+  water,
+  dumbbell,
+  leaf,
+  friends,
+  dots,
 }
 
 /// GPU-composited 8x8 Pixel Art Sprite renderer for Minecraft-themed iconography.
@@ -21,10 +44,109 @@ class PixelSpriteIcon extends StatelessWidget {
     this.secondaryColor,
   });
 
+  factory PixelSpriteIcon.fromKey(
+    String key, {
+    Key? widgetKey,
+    double size = 20,
+    Color? primaryColor,
+    Color? secondaryColor,
+  }) {
+    return PixelSpriteIcon(
+      key: widgetKey,
+      type: typeFromKey(key),
+      size: size,
+      primaryColor: primaryColor,
+      secondaryColor: secondaryColor,
+    );
+  }
+
   final PixelSpriteType type;
   final double size;
   final Color? primaryColor;
   final Color? secondaryColor;
+
+  /// Selectable habit icons for the Habit Editor.
+  static const List<(String key, String label, PixelSpriteType type)>
+      habitIconCatalog = <(String, String, PixelSpriteType)>[
+    ('potion', 'Potion', PixelSpriteType.potion),
+    ('code', 'Redstone', PixelSpriteType.code),
+    ('book', 'Tome', PixelSpriteType.book),
+    ('dumbbell', 'Strength', PixelSpriteType.dumbbell),
+    ('water', 'Water', PixelSpriteType.water),
+    ('leaf', 'Herb', PixelSpriteType.leaf),
+    ('sword', 'Blade', PixelSpriteType.sword),
+    ('diamond', 'Diamond', PixelSpriteType.diamond),
+    ('flame', 'Torch', PixelSpriteType.flame),
+    ('moon', 'Night', PixelSpriteType.moon),
+    ('sun', 'Sun', PixelSpriteType.sun),
+    ('crown', 'Crown', PixelSpriteType.crown),
+  ];
+
+  static PixelSpriteType typeFromKey(String? key) {
+    switch (key) {
+      case 'xpOrb':
+        return PixelSpriteType.xpOrb;
+      case 'pickaxe':
+        return PixelSpriteType.pickaxe;
+      case 'craftAxe':
+        return PixelSpriteType.craftAxe;
+      case 'sword':
+        return PixelSpriteType.sword;
+      case 'shield':
+        return PixelSpriteType.shield;
+      case 'goldBar':
+        return PixelSpriteType.goldBar;
+      case 'ironBar':
+        return PixelSpriteType.ironBar;
+      case 'redstoneBar':
+        return PixelSpriteType.redstoneBar;
+      case 'diamond':
+        return PixelSpriteType.diamond;
+      case 'potion':
+        return PixelSpriteType.potion;
+      case 'book':
+        return PixelSpriteType.book;
+      case 'flame':
+        return PixelSpriteType.flame;
+      case 'crown':
+        return PixelSpriteType.crown;
+      case 'chest':
+        return PixelSpriteType.chest;
+      case 'checkmark':
+        return PixelSpriteType.checkmark;
+      case 'heart':
+        return PixelSpriteType.heart;
+      case 'sunrise':
+        return PixelSpriteType.sunrise;
+      case 'sun':
+        return PixelSpriteType.sun;
+      case 'sunset':
+        return PixelSpriteType.sunset;
+      case 'moon':
+        return PixelSpriteType.moon;
+      case 'bell':
+        return PixelSpriteType.bell;
+      case 'alarm':
+        return PixelSpriteType.alarm;
+      case 'calendar':
+        return PixelSpriteType.calendar;
+      case 'code':
+        return PixelSpriteType.code;
+      case 'water':
+        return PixelSpriteType.water;
+      case 'dumbbell':
+        return PixelSpriteType.dumbbell;
+      case 'leaf':
+        return PixelSpriteType.leaf;
+      case 'friends':
+        return PixelSpriteType.friends;
+      case 'dots':
+        return PixelSpriteType.dots;
+      case 'star':
+      default:
+        return PixelSpriteType.star;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,105 +177,313 @@ class _PixelSpritePainter extends CustomPainter {
   final Color primaryColor;
   final Color secondaryColor;
 
-  static const List<String> _xpOrbGrid = <String>[
-    '..1111..',
-    '.122211.',
-    '12211111',
-    '12111111',
-    '11111211',
-    '11112211',
-    '.111111.',
-    '..1111..',
-  ];
-
-  static const List<String> _pickaxeGrid = <String>[
-    '...1111.',
-    '..111111',
-    '..11.211',
-    '....2.11',
-    '...2...1',
-    '..2.....',
-    '.2......',
-    '2.......',
-  ];
-
-  static const List<String> _flameGrid = <String>[
-    '....1...',
-    '...111..',
-    '..11211.',
-    '.112221.',
-    '.1222211',
-    '11222211',
-    '.112211.',
-    '..1111..',
-  ];
-
-  static const List<String> _crownGrid = <String>[
-    '1..11..1',
-    '11.11.11',
-    '11111111',
-    '12111121',
-    '11122111',
-    '11111111',
-    '.111111.',
-    '........',
-  ];
-
-  static const List<String> _chestGrid = <String>[
-    '.111111.',
-    '12222221',
-    '12222221',
-    '11122111',
-    '12222221',
-    '12222221',
-    '12222221',
-    '.111111.',
-  ];
-
-  static const List<String> _checkmarkGrid = <String>[
-    '.......1',
-    '......11',
-    '.....11.',
-    '1...11..',
-    '11.11...',
-    '.111....',
-    '..1.....',
-    '........',
-  ];
-
-  static const List<String> _heartGrid = <String>[
-    '.11..11.',
-    '12211111',
-    '12111111',
-    '11111111',
-    '.111111.',
-    '..1111..',
-    '...11...',
-    '........',
-  ];
-
-  List<String> _gridForType() {
-    switch (type) {
-      case PixelSpriteType.xpOrb:
-        return _xpOrbGrid;
-      case PixelSpriteType.pickaxe:
-        return _pickaxeGrid;
-      case PixelSpriteType.flame:
-        return _flameGrid;
-      case PixelSpriteType.crown:
-        return _crownGrid;
-      case PixelSpriteType.chest:
-        return _chestGrid;
-      case PixelSpriteType.checkmark:
-        return _checkmarkGrid;
-      case PixelSpriteType.heart:
-        return _heartGrid;
-    }
-  }
+  static const Map<PixelSpriteType, List<String>> _grids =
+      <PixelSpriteType, List<String>>{
+    PixelSpriteType.xpOrb: <String>[
+      '..1111..',
+      '.122211.',
+      '12211111',
+      '12111111',
+      '11111211',
+      '11112211',
+      '.111111.',
+      '..1111..',
+    ],
+    PixelSpriteType.pickaxe: <String>[
+      '...1111.',
+      '..111111',
+      '..11.211',
+      '....2.11',
+      '...2...1',
+      '..2.....',
+      '.2......',
+      '2.......',
+    ],
+    PixelSpriteType.craftAxe: <String>[
+      '..1111..',
+      '.111111.',
+      '.111211.',
+      '..122...',
+      '...2....',
+      '..2.11..',
+      '.2..11..',
+      '2.......',
+    ],
+    PixelSpriteType.sword: <String>[
+      '......11',
+      '.....121',
+      '....121.',
+      '...121..',
+      '.2121...',
+      '..22....',
+      '.2..2...',
+      '2.......',
+    ],
+    PixelSpriteType.shield: <String>[
+      '11111111',
+      '12222221',
+      '12111121',
+      '12122121',
+      '12111121',
+      '.122221.',
+      '..1221..',
+      '...11...',
+    ],
+    PixelSpriteType.goldBar: <String>[
+      '........',
+      '..11111.',
+      '.1222211',
+      '12211111',
+      '1111111.',
+      '.11111..',
+      '........',
+      '........',
+    ],
+    PixelSpriteType.ironBar: <String>[
+      '........',
+      '..11111.',
+      '.1222211',
+      '12211111',
+      '1111111.',
+      '.11111..',
+      '........',
+      '........',
+    ],
+    PixelSpriteType.redstoneBar: <String>[
+      '...11...',
+      '..1221..',
+      '.122221.',
+      '12211221',
+      '12222221',
+      '.122221.',
+      '..1111..',
+      '........',
+    ],
+    PixelSpriteType.diamond: <String>[
+      '..1111..',
+      '.122221.',
+      '12211221',
+      '12111121',
+      '11111111',
+      '.111111.',
+      '..1111..',
+      '...11...',
+    ],
+    PixelSpriteType.potion: <String>[
+      '...22...',
+      '..1221..',
+      '...11...',
+      '..1111..',
+      '.122221.',
+      '12211221',
+      '12222221',
+      '.111111.',
+    ],
+    PixelSpriteType.book: <String>[
+      '.111111.',
+      '12222211',
+      '12111211',
+      '12222211',
+      '12111211',
+      '12222211',
+      '11111111',
+      '.222222.',
+    ],
+    PixelSpriteType.flame: <String>[
+      '....1...',
+      '...111..',
+      '..11211.',
+      '.112221.',
+      '.1222211',
+      '11222211',
+      '.112211.',
+      '..1111..',
+    ],
+    PixelSpriteType.crown: <String>[
+      '1..11..1',
+      '11.11.11',
+      '11111111',
+      '12111121',
+      '11122111',
+      '11111111',
+      '.111111.',
+      '........',
+    ],
+    PixelSpriteType.chest: <String>[
+      '.111111.',
+      '12222221',
+      '12222221',
+      '11122111',
+      '12222221',
+      '12222221',
+      '12222221',
+      '.111111.',
+    ],
+    PixelSpriteType.checkmark: <String>[
+      '.......1',
+      '......11',
+      '.....11.',
+      '1...11..',
+      '11.11...',
+      '.111....',
+      '..1.....',
+      '........',
+    ],
+    PixelSpriteType.heart: <String>[
+      '.11..11.',
+      '12211111',
+      '12111111',
+      '11111111',
+      '.111111.',
+      '..1111..',
+      '...11...',
+      '........',
+    ],
+    PixelSpriteType.sunrise: <String>[
+      '...11...',
+      '.1.11.1.',
+      '..1221..',
+      '.122221.',
+      '11222211',
+      '22222222',
+      '.22..22.',
+      '........',
+    ],
+    PixelSpriteType.sun: <String>[
+      '1..11..1',
+      '.112211.',
+      '..1221..',
+      '11222211',
+      '11222211',
+      '..1221..',
+      '.112211.',
+      '1..11..1',
+    ],
+    PixelSpriteType.sunset: <String>[
+      '........',
+      '..1221..',
+      '.122221.',
+      '11222211',
+      '22222222',
+      '.111111.',
+      '..2222..',
+      '........',
+    ],
+    PixelSpriteType.moon: <String>[
+      '...1111.',
+      '..112211',
+      '.1121...',
+      '.1121...',
+      '.1121...',
+      '..112211',
+      '...1111.',
+      '........',
+    ],
+    PixelSpriteType.star: <String>[
+      '...11...',
+      '...11...',
+      '11122111',
+      '.112211.',
+      '..1221..',
+      '.11..11.',
+      '11....11',
+      '........',
+    ],
+    PixelSpriteType.bell: <String>[
+      '...11...',
+      '..1221..',
+      '.122221.',
+      '.122221.',
+      '.122221.',
+      '11111111',
+      '...22...',
+      '........',
+    ],
+    PixelSpriteType.alarm: <String>[
+      '11....11',
+      '1.1111.1',
+      '.122221.',
+      '.121221.',
+      '.121121.',
+      '.122221.',
+      '..1111..',
+      '.1....1.',
+    ],
+    PixelSpriteType.calendar: <String>[
+      '.11..11.',
+      '11111111',
+      '12222221',
+      '12112121',
+      '12222221',
+      '12122121',
+      '12222221',
+      '.111111.',
+    ],
+    PixelSpriteType.code: <String>[
+      '..1..1..',
+      '.1...1..',
+      '1...1..1',
+      '.1..1...1',
+      '..1.1..1.',
+      '....1.1..',
+      '...1.....',
+      '........',
+    ],
+    PixelSpriteType.water: <String>[
+      '...11...',
+      '..1111..',
+      '.121111.',
+      '.121111.',
+      '12111111',
+      '12211111',
+      '.111111.',
+      '..1111..',
+    ],
+    PixelSpriteType.dumbbell: <String>[
+      '.11..11.',
+      '111..111',
+      '11111111',
+      '11111111',
+      '111..111',
+      '.11..11.',
+      '........',
+      '........',
+    ],
+    PixelSpriteType.leaf: <String>[
+      '....1111',
+      '..112211',
+      '.122111.',
+      '.121111.',
+      '.11111..',
+      '..11....',
+      '.2......',
+      '2.......',
+    ],
+    PixelSpriteType.friends: <String>[
+      '.11..22.',
+      '.11..22.',
+      '11112222',
+      '11112222',
+      '.11..22.',
+      '.11..22.',
+      '........',
+      '........',
+    ],
+    PixelSpriteType.dots: <String>[
+      '........',
+      '........',
+      '........',
+      '11.11.11',
+      '11.11.11',
+      '........',
+      '........',
+      '........',
+    ],
+  };
 
   @override
   void paint(Canvas canvas, Size size) {
-    final grid = _gridForType();
+    final grid = _grids[type] ?? _grids[PixelSpriteType.star]!;
     final cellW = size.width / 8.0;
     final cellH = size.height / 8.0;
     final paint1 = Paint()..color = primaryColor;
@@ -161,7 +491,8 @@ class _PixelSpritePainter extends CustomPainter {
 
     for (var r = 0; r < 8; r++) {
       final row = grid[r];
-      for (var c = 0; c < 8; c++) {
+      final maxC = row.length < 8 ? row.length : 8;
+      for (var c = 0; c < maxC; c++) {
         final ch = row[c];
         if (ch == '.') continue;
         final rect = Rect.fromLTWH(c * cellW, r * cellH, cellW, cellH);
@@ -178,8 +509,63 @@ class _PixelSpritePainter extends CustomPainter {
   }
 }
 
+/// Compact, fixed-height pixel chip (replaces uneven Courier terminal boxes).
+class PixelTagChip extends StatelessWidget {
+  const PixelTagChip({
+    super.key,
+    required this.label,
+    this.color = PixelCupertinoTheme.emeraldXp,
+    this.icon,
+    this.glow = false,
+  });
+
+  final String label;
+  final Color color;
+  final PixelSpriteType? icon;
+  final bool glow;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 22,
+      padding: const EdgeInsets.symmetric(horizontal: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: color.withValues(alpha: 0.55),
+          width: 1,
+        ),
+        boxShadow: glow
+            ? PixelCupertinoTheme.glowShadows(color, intensity: 0.35)
+            : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            PixelSpriteIcon(
+              type: icon!,
+              size: 12,
+              primaryColor: color,
+            ),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: PixelCupertinoTheme.pixelBadgeStyle(
+              color: color,
+              fontSize: 9.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Minecraft-styled 3D beveled Voxel Card with Cupertino 10.0-12.0 border radius
-/// and subtle top-left highlight / bottom-right shadow border.
+/// and optional glowing aura when active.
 class VoxelBlockCard extends StatelessWidget {
   const VoxelBlockCard({
     super.key,
@@ -188,6 +574,7 @@ class VoxelBlockCard extends StatelessWidget {
     this.borderRadius = 11.0,
     this.accentBorderColor,
     this.backgroundColor,
+    this.glow = false,
   });
 
   final Widget child;
@@ -195,6 +582,7 @@ class VoxelBlockCard extends StatelessWidget {
   final double borderRadius;
   final Color? accentBorderColor;
   final Color? backgroundColor;
+  final bool glow;
 
   @override
   Widget build(BuildContext context) {
@@ -229,6 +617,11 @@ class VoxelBlockCard extends StatelessWidget {
             blurRadius: 0,
             spreadRadius: 0,
           ),
+          if (glow && accentBorderColor != null)
+            ...PixelCupertinoTheme.glowShadows(
+              accentBorderColor!,
+              intensity: 0.32,
+            ),
         ],
       ),
       child: child,
